@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="jp">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+        integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <!-- slimだとajax使えない件 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script> -->
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"
+        integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49"
+        crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+        integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+        crossorigin="anonymous"></script>
+    <!-- 本番バージョン、サイズと速度のために最適化されています -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.7.11"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <title>年末調整</title>
+
+    <style type="text/css">
+        [v-cloak] {
+            display: none;
+        }
+
+        .main {
+            text-align: center;
+        }
+
+        .sub {
+            display: inline-block;
+        }
+
+        .table {
+            width: 650px;
+        }
+
+        input[type=tel] {
+            text-align: right;
+        }
+
+        .cursorh {
+            cursor: help;
+        }
+
+        .hokenname {
+            cursor: pointer;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <main role="main" class="container">
+        <div id="nenmatsu" class="main" v-cloak>
+            <div class="sub">
+                <h3>生命保険料控除</h3>
+                <table class="table table-hover table-relative">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th colspan="6" class="cursorh" data-toggle="tooltip" data-placement="top" title="新・旧の区分">区分
+                            </th>
+                            <th colspan="6" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="あなたが本年中に支払った保険料等の金額(分配を受けた剰余金等の控除後の金額)">保険料(a)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 一般の生命保険料 -->
+                        <tr v-for="(item, label, idx) in seimei">
+                            <th v-if="idx===0" v-bind:rowspan="seimeiIsShow?Object.keys(seimei).length:1"
+                                v-on:click="seimeiIsShow=!seimeiIsShow" class="hokenname align-middle">
+                                {{seimeiIsShow?'－':'＋'}}　一般の生命保険料
+                            </th>
+                            <td colspan="6" v-if="seimeiIsShow||idx===0">
+                                <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                    <label v-bind:class="'btn btn-outline-secondary'+(item.kubun===0?' active':'')"
+                                        v-on:click="item.kubun=0">
+                                        <input type="radio" value="0" autocomplete="off" />新
+                                    </label>
+                                    <label v-bind:class="'btn btn-outline-secondary'+(item.kubun===1?' active':'')"
+                                        v-on:click="item.kubun=1">
+                                        <input type="radio" value="1" autocomplete="off" />旧
+                                    </label>
+                                </div>
+                            </td>
+                            <td colspan="6" v-if="seimeiIsShow||idx===0">
+                                <input type="tel" size="10" class="form-control" v-model="item.kingaku"
+                                    v-on:keyup="item.kingaku=no(item.kingaku)" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>新保険料合計</td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="(a)のうち新保険料等の金額の合計額">A</td>
+                            <td colspan="2"><span>{{seimeiAsum}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="Aの金額を計算式Ⅰ(新保険料等用)に当てはめて計算した金額">①</td>
+                            <td colspan="2"><span>{{seimeiAformula}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top" title="計（①＋②）">③
+                            </td>
+                            <td colspan="2"><span>{{seimeiTotal}}円</span></td>
+                        </tr>
+                        <tr>
+                            <td>旧保険料合計</td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="(a)のうち旧保険料等の金額の合計額">B</td>
+                            <td colspan="2"><span>{{seimeiBsum}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="Bの金額を計算式Ⅱ(旧保険料等用)に当てはめて計算した金額">②</td>
+                            <td colspan="2"><span>{{seimeiBformula}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="②と③のいずれか大きい金額">イ</td>
+                            <td colspan="2"><span>{{seimeiAnswer}}円</span></td>
+                        </tr>
+                        <!-- 介護医療保険料 -->
+                        <tr v-for="(item, label, idx) in kaigo">
+                            <th v-if="idx===0" v-bind:rowspan="kaigoIsShow?Object.keys(kaigo).length:1"
+                                v-on:click="kaigoIsShow=!kaigoIsShow" class="hokenname align-middle">
+                                {{kaigoIsShow?'－':'＋'}}　介護医療保険料
+                            </th>
+                            <td colspan="6" v-if="kaigoIsShow||idx===0"></td>
+                            <td colspan="6" v-if="kaigoIsShow||idx===0">
+                                <input type="tel" size="10" class="form-control" v-model="item.kingaku"
+                                    v-on:keyup="item.kingaku=no(item.kingaku)" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>保険料合計</td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="(a)の金額の合計額">C</td>
+                            <td colspan="2"><span>{{kaigoCsum}}円</span></td>
+                            <td colspan="2"></td>
+                            <td colspan="2"></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="Cの金額を計算式Ⅰ(新保険料等用)に当てはめて計算した金額">ロ</td>
+                            <td colspan="2"><span>{{kaigoAnswer}}円</span></td>
+                        </tr>
+                        <!-- 個人年金保険料 -->
+                        <tr v-for="(item, label, idx) in nenkin">
+                            <th v-if="idx===0" v-bind:rowspan="nenkinIsShow?Object.keys(nenkin).length:1"
+                                v-on:click="nenkinIsShow=!nenkinIsShow" class="hokenname align-middle">
+                                {{nenkinIsShow?'－':'＋'}}　個人年金保険料
+                            </th>
+                            <td colspan="6" v-if="nenkinIsShow||idx===0">
+                                <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                                    <label v-bind:class="'btn btn-outline-secondary'+(item.kubun===0?' active':'')"
+                                        v-on:click="item.kubun=0">
+                                        <input type="radio" value="0" autocomplete="off" />新
+                                    </label>
+                                    <label v-bind:class="'btn btn-outline-secondary'+(item.kubun===1?' active':'')"
+                                        v-on:click="item.kubun=1">
+                                        <input type="radio" value="1" autocomplete="off" />旧
+                                    </label>
+                                </div>
+                            </td>
+                            <td colspan="6" v-if="nenkinIsShow||idx===0">
+                                <input type="tel" size="10" class="form-control" v-model="item.kingaku"
+                                    v-on:keyup="item.kingaku=no(item.kingaku)" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>新保険料合計</td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="(a)のうち新保険料等の金額の合計額">D</td>
+                            <td colspan="2"><span>{{nenkinDsum}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="Dの金額を計算式Ⅰ(新保険料等用)に当てはめて計算した金額">④</td>
+                            <td colspan="2"><span>{{nenkinDformula}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top" title="計（④＋⑤）">⑥
+                            </td>
+                            <td colspan="2"><span>{{nenkinTotal}}円</span></td>
+                        </tr>
+                        <tr>
+                            <td>旧保険料合計</td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="(a)のうち旧保険料等の金額の合計額">E</td>
+                            <td colspan="2"><span>{{nenkinEsum}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="Eの金額を計算式Ⅱ(旧保険料等用)に当てはめて計算した金額">⑤</td>
+                            <td colspan="2"><span>{{nenkinEformula}}円</span></td>
+                            <td colspan="2" class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="⑤と⑥のいずれか大きい金額">ハ</td>
+                            <td colspan="2"><span>{{nenkinAnswer}}円</span></td>
+                        </tr>
+                        <tr>
+                            <th class="cursorh" data-toggle="tooltip" data-placement="top"
+                                title="生命保険料控除額計(イ＋ロ＋ハ)&#13;&#10;最高120,000円">生命保険料控除額</th>
+                            <td colspan="11"></td>
+                            <td>
+                                <span>{{koujo}}円</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="13">
+                                <button type="button" class="btn btn-outline-secondary btn-lg btn-block"
+                                    v-on:click="calc">計算する</button>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script type="text/javascript">
+        $(function () {
+            $('[data-toggle="tooltip"]').tooltip();
+        });
+        const vm = new Vue({
+            el: "#nenmatsu",
+            data: {
+                seimeiIsShow: false,
+                kaigoIsShow: false,
+                nenkinIsShow: false,
+                seimei:
+                {
+                    seimei0: { kubun: 0, kingaku: 0 },
+                    seimei1: { kubun: 0, kingaku: 0 },
+                    seimei2: { kubun: 0, kingaku: 0 },
+                    seimei3: { kubun: 0, kingaku: 0 },
+                },
+                kaigo:
+                {
+                    kaigo0: { kubun: 0, kingaku: 0 },
+                    kaigo1: { kubun: 0, kingaku: 0 },
+                },
+                nenkin:
+                {
+                    nenkin0: { kubun: 0, kingaku: 0 },
+                    nenkin1: { kubun: 0, kingaku: 0 },
+                    nenkin2: { kubun: 0, kingaku: 0 },
+                    nenkin3: { kubun: 0, kingaku: 0 },
+                },
+                seimeiAsum: 0,
+                seimeiBsum: 0,
+                seimeiAformula: 0,
+                seimeiBformula: 0,
+                seimeiTotal: 0,
+                seimeiAnswer: 0,
+                kaigoCsum: 0,
+                kaigoAnswer: 0,
+                nenkinDsum: 0,
+                nenkinEsum: 0,
+                nenkinDformula: 0,
+                nenkinEformula: 0,
+                nenkinTotal: 0,
+                nenkinAnswer: 0,
+                koujo: 0,
+            },
+            methods: {
+                //数字のみ入力可能
+                no: function (val) {
+                    const kingaku = String(val).replace(/\D/g, "");
+                    return kingaku === "" ? ""
+                        : parseInt(kingaku, 10);
+                },
+                //空文字をゼロに変換
+                no2: function (val) {
+                    const kingaku = String(val).replace(/\D/g, "");
+                    return kingaku === "" ? 0
+                        : parseInt(kingaku, 10);
+                },
+                //計算式Ⅰ
+                formula1: function (val) {
+                    if (val <= 20000) {
+                        return +val;
+                    } else if (val <= 40000) {
+                        return Math.ceil(val / 2 + 10000);
+                    } else if (val <= 80000) {
+                        return Math.ceil(val / 4 + 20000);
+                    } else {
+                        return 40000;
+                    }
+                },
+                //計算式Ⅱ
+                formula2: function (val) {
+                    if (val <= 25000) {
+                        return +val;
+                    } else if (val <= 50000) {
+                        return Math.ceil(val / 2 + 12500);
+                    } else if (val <= 100000) {
+                        return Math.ceil(val / 4 + 25000);
+                    } else {
+                        return 50000;
+                    }
+                },
+                //控除額を計算する
+                calc: function () {
+                    //生命保険料
+                    let seimeiAsum = 0;
+                    let seimeiBsum = 0;
+                    for (let item in this.seimei) {
+                        if (this.seimei[item].kubun === 0) {
+                            seimeiAsum += this.no2(this.seimei[item].kingaku);
+                        } else {
+                            seimeiBsum += this.no2(this.seimei[item].kingaku);
+                        }
+                    }
+                    this.seimeiAsum = seimeiAsum.toLocaleString("ja-JP");
+                    this.seimeiBsum = seimeiBsum.toLocaleString("ja-JP");
+
+                    const seimeiAformula = this.formula1(seimeiAsum);
+                    const seimeiBformula = this.formula2(seimeiBsum);
+                    this.seimeiAformula = seimeiAformula.toLocaleString("ja-JP");
+                    this.seimeiBformula = seimeiBformula.toLocaleString("ja-JP");
+
+                    const seimeiTotal = seimeiAformula + seimeiBformula > 40000 ? 40000 : seimeiAformula + seimeiBformula;
+                    const seimeiAnswer = seimeiTotal > seimeiBformula ? seimeiTotal : seimeiBformula;
+                    this.seimeiTotal = seimeiTotal.toLocaleString("ja-JP");
+                    this.seimeiAnswer = seimeiAnswer.toLocaleString("ja-JP");
+
+                    //介護保険料
+                    let kaigoCsum = 0;
+                    for (let item in this.kaigo) {
+                        if (this.kaigo[item].kubun === 0) {
+                            kaigoCsum += this.no2(this.kaigo[item].kingaku);
+                        } else {
+                            kaigoCsum += this.no2(this.kaigo[item].kingaku);
+                        }
+                    }
+                    this.kaigoCsum = kaigoCsum.toLocaleString("ja-JP");
+
+                    const kaigoAnswer = this.formula1(kaigoCsum);
+                    this.kaigoAnswer = kaigoAnswer.toLocaleString("ja-JP");
+
+                    //個人年金保険料
+                    let nenkinDsum = 0;
+                    let nenkinEsum = 0;
+                    for (let item in this.nenkin) {
+                        if (this.nenkin[item].kubun === 0) {
+                            nenkinDsum += this.no2(this.nenkin[item].kingaku);
+                        } else {
+                            nenkinEsum += this.no2(this.nenkin[item].kingaku);
+                        }
+                    }
+                    this.nenkinDsum = nenkinDsum.toLocaleString("ja-JP");
+                    this.nenkinEsum = nenkinEsum.toLocaleString("ja-JP");
+
+                    const nenkinDformula = this.formula1(nenkinDsum);
+                    const nenkinEformula = this.formula2(nenkinEsum);
+                    this.nenkinDformula = nenkinDformula.toLocaleString("ja-JP");
+                    this.nenkinEformula = nenkinEformula.toLocaleString("ja-JP");
+
+                    const nenkinTotal = nenkinDformula + nenkinEformula > 40000 ? 40000 : nenkinDformula + nenkinEformula;
+                    const nenkinAnswer = nenkinTotal > nenkinEformula ? nenkinTotal : nenkinEformula;
+                    this.nenkinTotal = nenkinTotal.toLocaleString("ja-JP");
+                    this.nenkinAnswer = nenkinAnswer.toLocaleString("ja-JP");
+
+                    //生命保険料控除額
+                    const koujo = seimeiAnswer + kaigoAnswer + nenkinAnswer
+                    this.koujo = (koujo > 120000 ? 120000 : koujo).toLocaleString("ja-JP");
+                },
+            }
+        });
+    </script>
+</body>
+
+</html>
